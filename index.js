@@ -4,6 +4,7 @@ let canvas = document.getElementById("canvas");
 let ctx = document.getElementById("canvas").getContext("2d");
 
 let workerUpdate;
+let firstRender = true;
 
 worker.onmessage = msg => {
     if (msg.data && msg.data.type) {
@@ -15,8 +16,9 @@ worker.onmessage = msg => {
                     type: "START",
                     windowSize: {width: window.innerWidth, height: window.innerHeight}
                 });
-                requestAnimationFrame(tick);
-                worker.postMessage({type: "TICK", now: performance.now()});
+
+                startMainLoop();
+
             }
             break;
             case "UPDATE": {
@@ -35,17 +37,44 @@ window.addEventListener("resize", () => {
     });
 });
 
-function tick(now) {
-    requestAnimationFrame(tick);
-
-    if(workerUpdate) {
-        render();
-        workerUpdate = undefined;
-    } else {
-        document.getElementById("missedFrames").innerHTML += `<li>Missed frame!</li>`;
-        console.log("MISSED FRAME");
-    }
-    worker.postMessage({type: "TICK", now});
+function startMainLoop() {
+    MainLoop
+        .setBegin((timestamp, delta) => {
+            worker.postMessage({
+                type: "BEGIN",
+                timestamp,
+                delta
+            });
+        })
+        .setUpdate(delta => {
+            worker.postMessage({
+                type: "UPDATE",
+                delta
+            });
+        })
+        .setDraw(interpolation => {
+            if(workerUpdate) {
+                render();
+                workerUpdate = undefined;
+            } else {
+                if(!firstRender) {
+                    document.getElementById("missedFrames").innerHTML += `<li>Missed frame!</li>`;
+                }
+            }
+            worker.postMessage({
+                type: "DRAW",
+                interpolation
+            });
+            firstRender = false;
+        })
+        .setEnd((fps, panic) => {
+            worker.postMessage({
+                type: "END",
+                fps,
+                panic 
+            });
+        })
+        .start();
 }
 
 function render() {
