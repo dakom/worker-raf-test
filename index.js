@@ -53,6 +53,10 @@ function startMainLoop() {
             });
         })
         .setDraw(interpolation => {
+            worker.postMessage({
+                type: "DRAW",
+                interpolation
+            });
             if(workerUpdate) {
                 render();
                 workerUpdate = undefined;
@@ -61,10 +65,6 @@ function startMainLoop() {
                     document.getElementById("missedFrames").innerHTML += `<li>Missed frame!</li>`;
                 }
             }
-            worker.postMessage({
-                type: "DRAW",
-                interpolation
-            });
             firstRender = false;
         })
         .setEnd((fps, panic) => {
